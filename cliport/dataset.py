@@ -3,6 +3,7 @@
 import os
 import pickle
 import warnings
+from collections import OrderedDict
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -20,6 +21,20 @@ BOUNDS = np.array([[0.25, 0.75], [-0.5, 0.5], [0, 0.28]])
 TASK_NAMES = (tasks.names).keys()
 TASK_NAMES = sorted(TASK_NAMES)[::-1]
 
+class FixSizeOrderedDict(OrderedDict):
+    def __init__(self, max, *args, **kwargs):
+        assert max > 0
+        self._max = max
+        super().__init__(*args, **kwargs)
+        self.print = True
+
+    def __setitem__(self, key, value):
+        OrderedDict.__setitem__(self, key, value)
+        if len(self) > self._max:
+            if self.print:
+                print("CACHE HAS BEEN FILLED")
+                self.print = False
+            self.popitem(False)
 
 class RavensDataset(Dataset):
     """A simple image dataset class."""
@@ -51,8 +66,8 @@ class RavensDataset(Dataset):
                     seed = int(fname[(fname.find('-') + 1):-4])
                     self.n_episodes += 1
                     self.max_seed = max(self.max_seed, seed)
-
-        self._cache = {}
+        if self.cache:
+            self._cache = FixSizeOrderedDict(self.cfg['dataset']['cache_size'])
 
         if self.n_demos > 0:
             self.images = self.cfg['dataset']['images']
